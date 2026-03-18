@@ -159,58 +159,30 @@
                             placeholder="Paste your API key here">
                         <button id="save-settings" class="btn btn-primary" style="width: 100%;">Save Configuration</button>
                     </div>
-                    <p style="font-size: 0.7rem; color: var(--slate-400); text-align: center;"> Don't have a key? <a
+
+                    <!-- Enhanced Security info inside modal -->
+                    <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--slate-100);">
+                        <h4 style="font-size: 0.75rem; font-weight: 800; color: var(--slate-800); text-transform: uppercase; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem;">
+                            <i class="fa-solid fa-shield-halved" style="color: var(--success);"></i> Privacy & Data Policy
+                        </h4>
+                        <p style="font-size: 0.7rem; color: var(--slate-600); line-height: 1.5; margin-bottom: 0.75rem;">
+                            Your Gemini API key is stored locally in your browser's <code>localStorage</code>. It is <strong>never transmitted</strong> to any server other than directly to Google's Generative AI API.
+                        </p>
+                        <p style="font-size: 0.7rem; color: var(--slate-600); line-height: 1.5;">
+                            This application is 100% serverless. We cannot see, store, or intercept your content or keys.
+                        </p>
+                    </div>
+
+                    <p style="font-size: 0.7rem; color: var(--slate-400); text-align: center; margin-top: 1.5rem;"> Don't have a key? <a
                             href="https://aistudio.google.com/app/apikey" target="_blank"
                             style="color: var(--primary-600); font-weight: 600;">Get one for free</a></p>
                 </div>
             </div>
         </div>
 
-        <!-- SEO & Info Footer -->
-        <footer style="background: white; border-top: 1px solid var(--slate-200); padding: 3rem 1.5rem; margin-top: auto;">
-            <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 3rem;">
-                
-                <!-- Security Disclosure - User Requested -->
-                <section>
-                    <h2 style="font-size: 0.9rem; font-weight: 800; color: var(--slate-800); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fa-solid fa-shield-halved" style="color: var(--success);"></i> Privacy & Security
-                    </h2>
-                    <p style="font-size: 0.85rem; color: var(--slate-600); line-height: 1.7;">
-                        Your API key is stored locally in your browser and is never shared with us. We do not have a server, so we cannot see or store your data. The key is only used to communicate directly with Google Gemini.
-                    </p>
-                </section>
-
-                <!-- Product Value / SEO Keywords -->
-                <section>
-                    <h2 style="font-size: 0.9rem; font-weight: 800; color: var(--slate-800); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fa-solid fa-bolt" style="color: var(--warning);"></i> Direct Conversion
-                    </h2>
-                    <p style="font-size: 0.85rem; color: var(--slate-600); line-height: 1.7;">
-                        <strong>RichtexttoMD</strong> is the best free online tool to convert <strong>Rich Text to Markdown</strong> instantly. Perfect for generating <code>.md</code> files for GitHub, blog posts, and documentation.
-                    </p>
-                </section>
-
-                <!-- Additional Context / Features -->
-                <section>
-                    <h2 style="font-size: 0.9rem; font-weight: 800; color: var(--slate-800); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fa-solid fa-microchip" style="color: var(--primary-600);"></i> AI Enhanced
-                    </h2>
-                    <p style="font-size: 0.85rem; color: var(--slate-600); line-height: 1.7;">
-                        Leverage <strong>Google Gemini AI</strong> to polish your writing, fix grammar, or summarize documents. 100% serverless conversion means your data stays yours.
-                    </p>
-                </section>
-            </div>
-            
-            <!-- Hidden SEO Keywords for Indexing -->
-            <div style="display: none;">
-                <h1>Rich Text to Markdown Converter</h1>
-                <h2>Convert HTML to MD Online</h2>
-                <h3>Free Markdown Editor with AI</h3>
-            </div>
-
-            <div style="text-align: center; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--slate-100); font-size: 0.8rem; color: var(--slate-400);">
-                &copy; 2026 RichtexttoMD. Dedicated to fast, secure, and private document conversion.
-            </div>
+        <!-- Minimalist Footer -->
+        <footer style="background: var(--white); border-top: 1px solid var(--slate-200); padding: 0.75rem; text-align: center; font-size: 0.7rem; color: var(--slate-400);">
+            &copy; 2026 RichtexttoMD &bull; All data stays local &bull; <span style="cursor: pointer; color: var(--primary-600); font-weight: 600;" onclick="document.getElementById('settings-modal').classList.add('active')">View Security Policy</span>
         </footer>
 
         <!-- Notification Toast -->
