@@ -1,6 +1,6 @@
-# ✍️ DocConvert: Premium Rich Text & Markdown Editor
+# ✍️ Richtexttomd: Premium Rich Text & Markdown Editor
 
-**DocConvert** is a modern, high-performance web tool designed for seamless conversion between Rich Text and Markdown. Built with a focus on premium aesthetics and user privacy, it features integrated AI capabilities powered by Google Gemini.
+**Richtexttomd** is a modern, high-performance web tool designed for seamless conversion between Rich Text and Markdown. Built with a focus on premium aesthetics and user privacy, it features integrated AI capabilities powered by Google Gemini.
 
 ![Live Demo](https://img.shields.io/badge/Status-Ready%20to%20Deploy-success)
 ![Vanilla JS](https://img.shields.io/badge/Made%20with-Vanilla%20JS-F7DF1E)
