@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RichtexttoMD | Convert Rich Text to Markdown Online | Free & Secure</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Free online converter to instantly turn Rich Text into Markdown. Features AI-powered polishing, summarization, and PDF import. 100% secure with local browser storage.">
+    <meta name="keywords" content="rich text to markdown, markdown converter, html to markdown, online markdown editor, quill to markdown, free markdown tool, ai text polish">
+    <meta name="author" content="RichtexttoMD">
+    <meta name="robots" content="index, follow">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://richtexttomd.com/">
+    <meta property="og:title" content="RichtexttoMD | Premium Rich Text & Markdown Editor">
+    <meta property="og:description" content="The fastest way to convert Rich Text to Markdown. Secure, local, and AI-enhanced.">
+    <meta property="og:image" content="https://richtexttomd.com/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="RichtexttoMD | Rich Text to Markdown Converter">
+    <meta property="twitter:description" content="Convert Rich Text to Markdown instantly with AI features. 100% private and secure.">
+
+    <link rel="icon" href="https://fav.farm/📝" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Editor & Markdown Libraries -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="selection:bg-blue-100">
+
+    <div class="app-container">
+
+        <!-- Premium Navbar -->
+        <header class="navbar">
+            <a href="#" class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-file-signature"></i>
+                </div>
+                <h1 class="brand-name">RichtexttoMD</h1>
+            </a>
+
+            <div class="nav-actions">
+                <input type="file" id="pdf-upload" accept=".pdf" style="display: none;">
+                <button id="upload-pdf-btn" class="btn btn-ghost" title="Import PDF and convert to MD">
+                    <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i>
+                    <span>PDF IMPORT</span>
+                </button>
+                <div id="live-sync-toggle" class="toggle-live-sync" title="Sync changes automatically">
+                    <span>LIVE SYNC</span>
+                    <div class="switch"></div>
+                </div>
+
+                <div class="export-group">
+                    <input type="text" id="filename-input" class="filename-input" placeholder="filename"
+                        value="RichtexttoMD-export">
+                    <span class="file-ext">.MD</span>
+                    <button id="export-btn" class="btn btn-primary">
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
+                        <span>Export</span>
+                    </button>
+                </div>
+
+                <button id="settings-btn" class="btn btn-ghost btn-icon-only" title="Settings">
+                    <i class="fa-solid fa-cog"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Dynamic Main Workspace -->
+        <main class="main-workspace">
+
+            <!-- Side A: Rich Text Editor -->
+            <section class="editor-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-paragraph"></i>
+                        <span>Rich Text Editor</span>
+                    </div>
+                    <div class="panel-actions">
+                        <button id="ai-polish-btn" class="ai-badge-btn btn-polish" title="AI Polish">
+                            <i class="fa-solid fa-sparkles"></i>
+                            <span>POLISH</span>
+                        </button>
+                        <button id="ai-summarize-btn" class="ai-badge-btn btn-summarize" title="AI Summarize">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>SUMMARIZE</span>
+                        </button>
+                        <button id="clear-rt" class="btn btn-ghost btn-clear" title="Clear Canvas">
+                            <i class="fa-solid fa-eraser"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div id="editor"></div>
+                </div>
+            </section>
+
+            <!-- Middle Sync Controls -->
+            <section class="center-controls">
+                <button id="convert-to-md" class="convert-btn" title="Convert to Markdown">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+                <button id="convert-to-rt" class="convert-btn" title="Convert to Rich Text">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+            </section>
+
+            <!-- Side B: Markdown Editor -->
+            <section class="editor-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-brands fa-markdown"></i>
+                        <span>Markdown Editor</span>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <textarea id="markdown-editor" spellcheck="false" placeholder="Write markdown here..."></textarea>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal-overlay">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3 style="font-family: 'Outfit'; font-weight: 800;">Application Settings</h3>
+                    <button id="close-settings" class="btn btn-ghost btn-icon-only" style="border: none;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-item" style="margin-bottom: 1.5rem;">
+                        <label for="api-key-input"
+                            style="font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 0.5rem;">Gemini
+                            API Key</label>
+                        <p style="font-size: 0.75rem; color: var(--slate-500); margin-bottom: 1rem;">Stored locally in
+                            your browser. Never shared.</p>
+                        <input type="password" id="api-key-input" class="filename-input"
+                            style="width: 100%; border: 1px solid var(--slate-200); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 1rem;"
+                            placeholder="Paste your API key here">
+                        <button id="save-settings" class="btn btn-primary" style="width: 100%;">Save Configuration</button>
+                    </div>
+                    <p style="font-size: 0.7rem; color: var(--slate-400); text-align: center;"> Don't have a key? <a
+                            href="https://aistudio.google.com/app/apikey" target="_blank"
+                            style="color: var(--primary-600); font-weight: 600;">Get one for free</a></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEO & Info Footer -->
+        <footer style="background: white; border-top: 1px solid var(--slate-200); padding: 3rem 1.5rem; margin-top: auto;">
+            <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 3rem;">
+                
+                <!-- Security Disclosure - User Requested -->
+                <section>
+                    <h2 style="font-size: 0.9rem; font-weight: 800; color: var(--slate-800); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-shield-halved" style="color: var(--success);"></i> Privacy & Security
+                    </h2>
+                    <p style="font-size: 0.85rem; color: var(--slate-600); line-height: 1.7;">
+                        Your API key is stored locally in your browser and is never shared with us. We do not have a server, so we cannot see or store your data. The key is only used to communicate directly with Google Gemini.
+                    </p>
+                </section>
+
+                <!-- Product Value / SEO Keywords -->
+                <section>
+                    <h2 style="font-size: 0.9rem; font-weight: 800; color: var(--slate-800); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-bolt" style="color: var(--warning);"></i> Direct Conversion
+                    </h2>
+                    <p style="font-size: 0.85rem; color: var(--slate-600); line-height: 1.7;">
+                        <strong>RichtexttoMD</strong> is the best free online tool to convert <strong>Rich Text to Markdown</strong> instantly. Perfect for generating <code>.md</code> files for GitHub, blog posts, and documentation.
+                    </p>
+                </section>
+
+                <!-- Additional Context / Features -->
+                <section>
+                    <h2 style="font-size: 0.9rem; font-weight: 800; color: var(--slate-800); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-microchip" style="color: var(--primary-600);"></i> AI Enhanced
+                    </h2>
+                    <p style="font-size: 0.85rem; color: var(--slate-600); line-height: 1.7;">
+                        Leverage <strong>Google Gemini AI</strong> to polish your writing, fix grammar, or summarize documents. 100% serverless conversion means your data stays yours.
+                    </p>
+                </section>
+            </div>
+            
+            <!-- Hidden SEO Keywords for Indexing -->
+            <div style="display: none;">
+                <h1>Rich Text to Markdown Converter</h1>
+                <h2>Convert HTML to MD Online</h2>
+                <h3>Free Markdown Editor with AI</h3>
+            </div>
+
+            <div style="text-align: center; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--slate-100); font-size: 0.8rem; color: var(--slate-400);">
+                &copy; 2026 RichtexttoMD. Dedicated to fast, secure, and private document conversion.
+            </div>
+        </footer>
+
+        <!-- Notification Toast -->
+        <div id="toast">
+            <i id="toast-icon" class="fa-solid fa-circle-check"></i>
+            <span id="toast-msg" class="toast-msg">Settings saved successfully</span>
+        </div>
+
+    </div>
+
+    <!-- Application Module -->
+    <script src="app.js"></script>
+</body>
+
+</html>
