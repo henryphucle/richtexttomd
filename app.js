@@ -121,12 +121,68 @@ function syncRTtoMD() {
     if (STATE.isSyncingFromMD) return;
     STATE.isSyncingFromRT = true;
 
-    const html = quill.root.innerHTML;
-    const md = turndownService.turndown(html);
+    // Get a clone of the editor's content to manipulate safely
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = quill.root.innerHTML;
+    
+    // Convert Quill's flat list structure (li with ql-indent-N) into standard nested HTML lists
+    fixQuillLists(tempDiv);
+    
+    const md = turndownService.turndown(tempDiv.innerHTML);
     DOM.markdownInput.value = md;
 
     STATE.isSyncingFromRT = false;
     console.log('RT -> MD Synced');
+}
+
+/**
+ * Transforms Quill's flat list structure into standard nested HTML (ol/ul > li > ol/ul > li).
+ * This allows Turndown to perceive the nesting and generate correct indented Markdown.
+ */
+function fixQuillLists(container) {
+    const lists = container.querySelectorAll('ol, ul');
+    lists.forEach(originalList => {
+        const items = Array.from(originalList.querySelectorAll(':scope > li'));
+        if (items.length === 0) return;
+        
+        const newRoot = document.createElement(originalList.tagName);
+        let stack = [{ level: 0, list: newRoot }];
+        
+        items.forEach(item => {
+            const match = item.className.match(/ql-indent-(\d+)/);
+            const level = match ? parseInt(match[1], 10) : 0;
+            
+            // Go up if current level is lower than top of stack
+            while (stack.length > 1 && level < stack[stack.length - 1].level) {
+                stack.pop();
+            }
+            
+            // Go down if current level is higher than top of stack
+            if (level > stack[stack.length - 1].level) {
+                const lastLi = stack[stack.length - 1].list.lastElementChild;
+                if (lastLi) {
+                    const subList = document.createElement(originalList.tagName);
+                    lastLi.appendChild(subList);
+                    stack.push({ level: level, list: subList });
+                }
+            }
+            
+            // Clone item and clean up Quill-specific classes
+            const itemClone = item.cloneNode(true);
+            const classesToRemove = Array.from(itemClone.classList).filter(c => c.startsWith('ql-indent-'));
+            if (classesToRemove.length > 0) {
+                itemClone.classList.remove(...classesToRemove);
+            }
+            if (itemClone.classList.length === 0) {
+                itemClone.removeAttribute('class');
+            }
+            
+            // Append to the current active list in the stack
+            stack[stack.length - 1].list.appendChild(itemClone);
+        });
+        
+        originalList.replaceWith(newRoot);
+    });
 }
 
 function syncMDtoRT() {
@@ -344,7 +400,7 @@ async function handlePdfUpload(e) {
             // Success Popup state
             document.querySelector('.loading-title').innerText = "All Set!";
             document.querySelector('.loading-subtitle').innerText = "Your content has been imported to the editor.";
-            
+
             setTimeout(() => {
                 DOM.loadingOverlay.classList.remove('active');
                 uploadBtn.innerHTML = originalHtml;
@@ -420,6 +476,13 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     DOM.markdownInput.addEventListener('input', handleMDChange);
+
+    DOM.filenameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            exportMarkdown();
+        }
+    });
 
     DOM.liveSyncToggle.addEventListener('click', () => {
         STATE.liveSyncEnabled = !STATE.liveSyncEnabled;
