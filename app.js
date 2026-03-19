@@ -56,12 +56,13 @@ function initQuill() {
         theme: 'snow',
         placeholder: 'Start writing your rich text...',
         modules: {
+            table: true, // Enabled table module in v2
             toolbar: [
                 [{ 'header': [1, 2, 3, false] }],
                 ['bold', 'italic', 'underline', 'strike'],
                 ['blockquote', 'code-block'],
                 [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                ['link', 'clean']
+                ['link', 'table', 'clean'] // Added table to toolbar
             ]
         }
     });
@@ -77,6 +78,11 @@ function initTurndown() {
         codeBlockStyle: 'fenced',
         emDelimiter: '*'
     });
+    
+    // Add Github Flavored Markdown (GFM) support for tables, task lists, etc.
+    if (typeof turndownPluginGfm !== 'undefined') {
+        turndownService.use(turndownPluginGfm.gfm);
+    }
 }
 
 // --- Core Logic ---
@@ -125,8 +131,8 @@ function syncRTtoMD() {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = quill.root.innerHTML;
     
-    // Convert Quill's flat list structure (li with ql-indent-N) into standard nested HTML lists
-    fixQuillLists(tempDiv);
+    // Convert Quill's flat list structure and handle tables for GFM compatibility
+    prepareHTMLForMarkdown(tempDiv);
     
     const md = turndownService.turndown(tempDiv.innerHTML);
     DOM.markdownInput.value = md;
@@ -139,7 +145,13 @@ function syncRTtoMD() {
  * Transforms Quill's flat list structure into standard nested HTML (ol/ul > li > ol/ul > li).
  * This allows Turndown to perceive the nesting and generate correct indented Markdown.
  */
-function fixQuillLists(container) {
+/**
+ * Prepares Quill-generated HTML for cleaner Markdown conversion.
+ * - Transforms flat list structure into standard nested HTML.
+ * - Converts the first row of tables to header rows (th) for GFM compatibility.
+ */
+function prepareHTMLForMarkdown(container) {
+    // 1. Handle Lists
     const lists = container.querySelectorAll('ol, ul');
     lists.forEach(originalList => {
         const items = Array.from(originalList.querySelectorAll(':scope > li'));
@@ -152,12 +164,10 @@ function fixQuillLists(container) {
             const match = item.className.match(/ql-indent-(\d+)/);
             const level = match ? parseInt(match[1], 10) : 0;
             
-            // Go up if current level is lower than top of stack
             while (stack.length > 1 && level < stack[stack.length - 1].level) {
                 stack.pop();
             }
             
-            // Go down if current level is higher than top of stack
             if (level > stack[stack.length - 1].level) {
                 const lastLi = stack[stack.length - 1].list.lastElementChild;
                 if (lastLi) {
@@ -167,7 +177,6 @@ function fixQuillLists(container) {
                 }
             }
             
-            // Clone item and clean up Quill-specific classes
             const itemClone = item.cloneNode(true);
             const classesToRemove = Array.from(itemClone.classList).filter(c => c.startsWith('ql-indent-'));
             if (classesToRemove.length > 0) {
@@ -177,12 +186,85 @@ function fixQuillLists(container) {
                 itemClone.removeAttribute('class');
             }
             
-            // Append to the current active list in the stack
             stack[stack.length - 1].list.appendChild(itemClone);
         });
         
         originalList.replaceWith(newRoot);
     });
+
+    // 2. Handle Tables (GFM requires <th> in the first row to detect a table)
+    const tables = container.getElementsByTagName('table');
+    for (let i = 0; i < tables.length; i++) {
+        const table = tables[i];
+        const rows = table.getElementsByTagName('tr');
+        if (rows.length > 0) {
+            const firstRow = rows[0];
+            const cells = Array.from(firstRow.getElementsByTagName('td'));
+            cells.forEach(td => {
+                const th = document.createElement('th');
+                th.innerHTML = td.innerHTML;
+                // Copy over attributes (important for Quill's data-row identifiers)
+                for (let k = 0; k < td.attributes.length; k++) {
+                    const attr = td.attributes[k];
+                    th.setAttribute(attr.name, attr.value);
+                }
+                if (td.parentNode) {
+                    td.parentNode.replaceChild(th, td);
+                }
+            });
+        }
+    }
+}
+
+/**
+ * Standardizes HTML (from Marked or AI) to ensure it plays nicely with Quill 2.0.
+ * - Collapses <thead> into <tbody> for tables.
+ * - Converts <th> to <td> to avoid fragmentation.
+ */
+function fixHTMLForQuill(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    const tables = doc.querySelectorAll('table');
+    tables.forEach(table => {
+        let thead = table.querySelector('thead');
+        let tbody = table.querySelector('tbody');
+        
+        if (thead) {
+            if (!tbody) {
+                tbody = document.createElement('tbody');
+                table.appendChild(tbody);
+            }
+            const headRows = Array.from(thead.querySelectorAll('tr'));
+            headRows.reverse().forEach(row => {
+                tbody.prepend(row);
+            });
+            thead.remove();
+        }
+
+        const ths = table.querySelectorAll('th');
+        ths.forEach(th => {
+            const td = document.createElement('td');
+            td.innerHTML = th.innerHTML;
+            if (th.className) td.className = th.className;
+            th.replaceWith(td);
+        });
+
+        // Aggressively remove whitespace-only text nodes within the table to avoid Quill fragmentation
+        const cleanWhitespace = (node) => {
+            const children = Array.from(node.childNodes);
+            children.forEach(child => {
+                if (child.nodeType === 3 && !child.textContent.trim()) {
+                    child.remove();
+                } else if (child.nodeType === 1) {
+                    cleanWhitespace(child);
+                }
+            });
+        };
+        cleanWhitespace(table);
+    });
+
+    return doc.body.innerHTML;
 }
 
 function syncMDtoRT() {
@@ -190,7 +272,11 @@ function syncMDtoRT() {
     STATE.isSyncingFromMD = true;
 
     const md = DOM.markdownInput.value;
-    const html = marked.parse(md);
+    let html = marked.parse(md);
+    
+    // Standardize HTML (tables, etc.) for better Quill 2.0 compatibility
+    html = fixHTMLForQuill(html);
+    
     quill.clipboard.dangerouslyPasteHTML(html);
 
     STATE.isSyncingFromMD = false;
@@ -286,7 +372,7 @@ async function handleAIPolish() {
 
     if (result) {
         const clean = result.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
-        quill.clipboard.dangerouslyPasteHTML(clean);
+        quill.clipboard.dangerouslyPasteHTML(fixHTMLForQuill(clean));
         saveToLocal();
         showToast("AI Polish Applied");
     }
@@ -312,7 +398,7 @@ async function handleAISummarize() {
 
     if (result) {
         const clean = result.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
-        quill.clipboard.dangerouslyPasteHTML(clean + "<br>" + quill.root.innerHTML);
+        quill.clipboard.dangerouslyPasteHTML(fixHTMLForQuill(clean) + "<br>" + quill.root.innerHTML);
         saveToLocal();
         showToast("AI Summary Added");
     }
