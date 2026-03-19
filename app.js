@@ -8,6 +8,9 @@
  * - Premium Toast notifications
  */
 
+// App Configuration
+const APP_VERSION = '1.0.0';
+
 // State Management
 const STATE = {
     isSyncingFromRT: false,
@@ -22,6 +25,7 @@ let DOM = {};
 
 function initDOM() {
     DOM = {
+        appVersion: document.getElementById('app-version'),
         editor: document.getElementById('editor'),
         markdownInput: document.getElementById('markdown-editor'),
         convertToMdBtn: document.getElementById('convert-to-md'),
@@ -531,6 +535,11 @@ async function handlePdfUpload(e) {
 // --- Initialization ---
 window.addEventListener('DOMContentLoaded', () => {
     initDOM();
+    
+    if (DOM.appVersion) {
+        DOM.appVersion.textContent = `v${APP_VERSION}`;
+    }
+
     initQuill();
     initTurndown();
     loadFromLocal();
