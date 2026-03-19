@@ -63,7 +63,7 @@
 
             <div class="nav-actions">
                 <input type="file" id="pdf-upload" accept=".pdf" style="display: none;">
-                <button id="upload-pdf-btn" class="btn btn-ghost" title="Import PDF and convert to MD">
+                <button id="upload-pdf-btn" class="btn btn-ghost" title="Import PDF and convert to MD (Max 1MB)">
                     <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i>
                     <span>PDF IMPORT</span>
                 </button>
@@ -198,6 +198,17 @@
                 style="cursor: pointer; color: var(--primary-600); font-weight: 600;"
                 onclick="document.getElementById('settings-modal').classList.add('active')">View Security Policy</span>
         </footer>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay">
+            <div class="loading-content">
+                <div class="spinner-container">
+                    <div class="loader"></div>
+                </div>
+                <h2 class="loading-title">Processing PDF</h2>
+                <p class="loading-subtitle">Gemini is converting your document to Markdown...</p>
+            </div>
+        </div>
 
         <!-- Notification Toast -->
         <div id="toast">

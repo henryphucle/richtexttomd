@@ -38,7 +38,8 @@ function initDOM() {
         apiKeyInput: document.getElementById('api-key-input'),
         toast: document.getElementById('toast'),
         toastMsg: document.getElementById('toast-msg'),
-        toastIcon: document.getElementById('toast-icon')
+        toastIcon: document.getElementById('toast-icon'),
+        loadingOverlay: document.getElementById('loading-overlay')
     };
 }
 
@@ -219,6 +220,9 @@ async function handleAIPolish() {
 
     DOM.aiPolishBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> POLISHING...';
     DOM.aiPolishBtn.disabled = true;
+    DOM.loadingOverlay.classList.add('active');
+    document.querySelector('.loading-title').innerText = "AI Polishing";
+    document.querySelector('.loading-subtitle').innerText = "Gemini is improving your text for clarity and grammar...";
 
     const prompt = `Polish this HTML content for clarity and grammar. Return ONLY valid HTML.\n\n${html}`;
     const system = "You are a professional editor. Output only clean, valid HTML matching the input's structure.";
@@ -233,6 +237,7 @@ async function handleAIPolish() {
 
     DOM.aiPolishBtn.innerHTML = '<i class="fa-solid fa-sparkles"></i> POLISH';
     DOM.aiPolishBtn.disabled = false;
+    DOM.loadingOverlay.classList.remove('active');
 }
 
 async function handleAISummarize() {
@@ -241,6 +246,9 @@ async function handleAISummarize() {
 
     DOM.aiSummarizeBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> SUMMARIZING...';
     DOM.aiSummarizeBtn.disabled = true;
+    DOM.loadingOverlay.classList.add('active');
+    document.querySelector('.loading-title').innerText = "AI Summarizing";
+    document.querySelector('.loading-subtitle').innerText = "Gemini is creating a summary of your content...";
 
     const prompt = `Summarize this content as a short HTML paragraph starting with '✨ AI Summary:'.\n\n${text}`;
     const system = "Output ONLY a single HTML paragraph (<p>...).";
@@ -255,6 +263,7 @@ async function handleAISummarize() {
 
     DOM.aiSummarizeBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> SUMMARIZE';
     DOM.aiSummarizeBtn.disabled = false;
+    DOM.loadingOverlay.classList.remove('active');
 }
 
 async function handlePdfUpload(e) {
@@ -269,44 +278,90 @@ async function handlePdfUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
 
+    // File size limit: 1MB
+    const MAX_SIZE = 1 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+        showToast("File is too large! Maximum size is 1MB.", "fa-circle-exclamation");
+        e.target.value = '';
+        return;
+    }
+
     const uploadBtn = document.getElementById('upload-pdf-btn');
     const originalHtml = uploadBtn.innerHTML;
     uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> UPLOADING...';
     uploadBtn.disabled = true;
 
+    DOM.loadingOverlay.classList.add('active');
+    document.querySelector('.loading-title').innerText = "Processing PDF";
+    document.querySelector('.loading-subtitle').innerText = "Gemini is converting your document to Markdown...";
+
     try {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            const base64 = reader.result.split(',')[1];
-            const prompt = "Convert this PDF to well-formatted Markdown. Return ONLY markdown.";
+        const fetchPdfMarkdown = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                    const base64 = reader.result.split(',')[1];
+                    const prompt = "Convert this PDF to well-formatted Markdown. Return ONLY markdown.";
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { inlineData: { mimeType: "application/pdf", data: base64 } }
-                        ]
-                    }]
-                })
+                    try {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{
+                                    parts: [
+                                        { text: prompt },
+                                        { inlineData: { mimeType: "application/pdf", data: base64 } }
+                                    ]
+                                }]
+                            })
+                        });
+                        const data = await response.json();
+                        resolve(data.candidates?.[0]?.content?.parts?.[0]?.text || "");
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
             });
-            const data = await response.json();
-            const md = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-            if (md) {
-                DOM.markdownInput.value = md.replace(/^```markdown\s*/i, '').replace(/```\s*$/i, '');
-                syncMDtoRT();
-                showToast("PDF Converted Successfully");
-            }
         };
-        reader.readAsDataURL(file);
+
+        const md = await fetchPdfMarkdown(file);
+
+        if (md) {
+            const cleanMd = md.replace(/^```markdown\s*/i, '').replace(/```\s*$/i, '');
+
+            // Load to RT first
+            const html = marked.parse(cleanMd);
+            quill.clipboard.dangerouslyPasteHTML(html);
+
+            // Then sync to MD editor
+            DOM.markdownInput.value = cleanMd;
+
+            saveToLocal();
+
+            // Success Popup state
+            document.querySelector('.loading-title').innerText = "All Set!";
+            document.querySelector('.loading-subtitle').innerText = "Your content has been imported to the editor.";
+            
+            setTimeout(() => {
+                DOM.loadingOverlay.classList.remove('active');
+                uploadBtn.innerHTML = originalHtml;
+                uploadBtn.disabled = false;
+                showToast("PDF Converted Successfully");
+            }, 1000);
+        } else {
+            throw new Error("No content returned");
+        }
+
     } catch (err) {
+        console.error(err);
         showToast("PDF Conversion Failed", "fa-circle-exclamation");
-    } finally {
+        DOM.loadingOverlay.classList.remove('active');
         uploadBtn.innerHTML = originalHtml;
         uploadBtn.disabled = false;
+    } finally {
         e.target.value = '';
     }
 }
