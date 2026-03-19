@@ -52,20 +52,40 @@ let quill;
 let turndownService;
 
 function initQuill() {
+    // Register a custom icon for table deletion
+    const icons = Quill.import('ui/icons');
+    icons['table-delete'] = '<i class="fa-solid fa-trash-can" style="font-size: 14px;"></i>';
+
     quill = new Quill('#editor', {
         theme: 'snow',
         placeholder: 'Start writing your rich text...',
         modules: {
             table: true, // Enabled table module in v2
-            toolbar: [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                ['blockquote', 'code-block'],
-                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                ['link', 'table', 'clean'] // Added table to toolbar
-            ]
+            toolbar: {
+                container: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    ['blockquote', 'code-block'],
+                    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                    ['link', 'table', 'table-delete', 'clean'] // Added table-delete
+                ],
+                handlers: {
+                    'table-delete': function() {
+                        const tableModule = quill.getModule('table');
+                        if (tableModule) {
+                            tableModule.deleteTable();
+                        }
+                    }
+                }
+            }
         }
     });
+
+    // Add a tooltip to our custom button
+    const deleteBtn = document.querySelector('.ql-table-delete');
+    if (deleteBtn) {
+        deleteBtn.setAttribute('title', 'Delete Table');
+    }
 
     quill.on('text-change', () => {
         handleRTChange();
