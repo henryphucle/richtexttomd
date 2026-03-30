@@ -60,10 +60,10 @@ body {
     color: var(--slate-900);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    overflow-x: hidden;
+    overflow: hidden;
 }
 
 html {
@@ -72,10 +72,11 @@ html {
 
 /* Layout Utilities */
 .app-container {
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     flex: 1;
+    overflow: hidden;
 }
 
 /* Header Styling */
@@ -276,6 +277,7 @@ html {
     display: flex;
     padding: 1.5rem;
     gap: 1.5rem;
+    min-height: 0; /* Crucial: allows flex items to shrink below content size */
     background: linear-gradient(to bottom, #fcfdff, var(--slate-50));
 }
 
@@ -288,6 +290,7 @@ html {
     border: 1px solid var(--slate-200);
     box-shadow: var(--shadow-soft);
     overflow: hidden;
+    min-height: 0; /* Allows panel to shrink to fit parent flex container */
     transition: var(--transition-base);
 }
 
@@ -308,8 +311,10 @@ html {
 
 @media (max-width: 640px) {
     .panel-header {
-        height: 40px;
-        padding: 0 0.75rem;
+        height: auto;
+        min-height: 48px;
+        flex-wrap: wrap;
+        padding: 0.5rem;
     }
 }
 
@@ -377,13 +382,14 @@ html {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    /* Quill handles its own overflow-y in .ql-editor */
 }
 
 #markdown-editor {
     flex: 1;
     display: block;
     width: 100%;
-    height: 100%; /* Fallback */
+    overflow-y: auto;
     padding: 1.5rem;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     font-size: 0.875rem;
@@ -485,6 +491,7 @@ html {
 
     .app-container {
         overflow-x: hidden;
+        height: auto;
     }
 
     .navbar {

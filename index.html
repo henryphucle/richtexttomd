@@ -44,6 +44,12 @@
     <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
     <script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- PDF.js for Local Conversion -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 
     <!-- Custom Styles -->
     <link rel="stylesheet" href="styles.css">
@@ -64,7 +70,7 @@
 
             <div class="nav-actions">
                 <input type="file" id="pdf-upload" accept=".pdf" style="display: none;">
-                <button id="upload-pdf-btn" class="btn btn-ghost" title="Import PDF and convert to MD (Max 1MB)">
+                <button id="upload-pdf-btn" class="btn btn-ghost" title="Import PDF and convert to MD (Max 50MB)">
                     <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i>
                     <span>PDF IMPORT</span>
                 </button>
@@ -100,6 +106,14 @@
                         <span>Rich Text Editor</span>
                     </div>
                     <div class="panel-actions">
+                        <button id="rt-copy-btn" class="ai-badge-btn" title="Copy Rich Text">
+                            <i class="fa-solid fa-copy"></i>
+                            <span>COPY</span>
+                        </button>
+                        <button id="rt-paste-btn" class="ai-badge-btn" title="Paste Rich Text">
+                            <i class="fa-solid fa-paste"></i>
+                            <span>PASTE</span>
+                        </button>
                         <button id="ai-polish-btn" class="ai-badge-btn btn-polish" title="AI Polish">
                             <i class="fa-solid fa-sparkles"></i>
                             <span>POLISH</span>
@@ -134,6 +148,16 @@
                     <div class="panel-title">
                         <i class="fa-brands fa-markdown"></i>
                         <span>Markdown Editor</span>
+                    </div>
+                    <div class="panel-actions">
+                        <button id="md-copy-btn" class="ai-badge-btn" title="Copy Markdown">
+                            <i class="fa-solid fa-copy"></i>
+                            <span>COPY</span>
+                        </button>
+                        <button id="md-paste-btn" class="ai-badge-btn" title="Paste Markdown">
+                            <i class="fa-solid fa-paste"></i>
+                            <span>PASTE</span>
+                        </button>
                     </div>
                 </div>
                 <div class="panel-content">
@@ -197,8 +221,8 @@
             style="background: var(--white); border-top: 1px solid var(--slate-200); padding: 0.75rem; text-align: center; font-size: 0.7rem; color: var(--slate-400);">
             &copy; 2026 Richtexttomd &bull; All data stays local &bull; <span
                 style="cursor: pointer; color: var(--primary-600); font-weight: 600;"
-                onclick="document.getElementById('settings-modal').classList.add('active')">View Security Policy</span> &bull; <span
-                id="app-version">v1.0.0</span>
+                onclick="document.getElementById('settings-modal').classList.add('active')">View Security Policy</span>
+            &bull; <span id="app-version">v1.0.0</span>
         </footer>
 
         <!-- Loading Overlay -->

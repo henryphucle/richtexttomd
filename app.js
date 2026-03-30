@@ -43,7 +43,13 @@ function initDOM() {
         toast: document.getElementById('toast'),
         toastMsg: document.getElementById('toast-msg'),
         toastIcon: document.getElementById('toast-icon'),
-        loadingOverlay: document.getElementById('loading-overlay')
+        loadingOverlay: document.getElementById('loading-overlay'),
+        loadingTitle: document.querySelector('.loading-title'),
+        loadingSubtitle: document.querySelector('.loading-subtitle'),
+        rtCopyBtn: document.getElementById('rt-copy-btn'),
+        rtPasteBtn: document.getElementById('rt-paste-btn'),
+        mdCopyBtn: document.getElementById('md-copy-btn'),
+        mdPasteBtn: document.getElementById('md-paste-btn')
     };
 }
 
@@ -380,6 +386,62 @@ async function generateAIContent(prompt, systemInstruction) {
     }
 }
 
+// --- Clipboard Handlers ---
+
+async function handleCopy(type) {
+    let content = "";
+    if (type === 'rt') {
+        content = quill.root.innerHTML;
+        // For RT, we also want plain text fallback
+        const plain = quill.getText();
+        
+        try {
+            const blobHtml = new Blob([content], { type: 'text/html' });
+            const blobText = new Blob([plain], { type: 'text/plain' });
+            const data = [new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })];
+            await navigator.clipboard.write(data);
+            showToast("Rich Text Copied to Clipboard");
+        } catch (err) {
+            // Fallback to text-only if ClipboardItem fails
+            await navigator.clipboard.writeText(plain);
+            showToast("Text Copied (HTML export failed)", "fa-circle-exclamation");
+        }
+    } else {
+        content = DOM.markdownInput.value;
+        if (!content.trim()) return showToast("Nothing to copy!", "fa-circle-exclamation");
+        await navigator.clipboard.writeText(content);
+        showToast("Markdown Copied to Clipboard");
+    }
+}
+
+async function handlePaste(type) {
+    try {
+        const text = await navigator.clipboard.readText();
+        if (!text) return showToast("Clipboard is empty!", "fa-circle-exclamation");
+        
+        if (type === 'rt') {
+            // Determine if it's likely HTML
+            if (text.includes('<') && text.includes('>')) {
+                quill.clipboard.dangerouslyPasteHTML(text);
+            } else {
+                quill.insertText(quill.getSelection()?.index || 0, text);
+            }
+            showToast("Pasted into Rich Text");
+        } else {
+            const start = DOM.markdownInput.selectionStart;
+            const end = DOM.markdownInput.selectionEnd;
+            const current = DOM.markdownInput.value;
+            DOM.markdownInput.value = current.substring(0, start) + text + current.substring(end);
+            DOM.markdownInput.selectionStart = DOM.markdownInput.selectionEnd = start + text.length;
+            handleMDChange();
+            showToast("Pasted into Markdown");
+        }
+    } catch (err) {
+        console.error(err);
+        showToast("Paste Failed: Check browser permissions", "fa-circle-exclamation");
+    }
+}
+
 async function handleAIPolish() {
     const html = quill.root.innerHTML;
     if (!quill.getText().trim()) return showToast("Nothing to polish!", "fa-circle-exclamation");
@@ -432,98 +494,227 @@ async function handleAISummarize() {
     DOM.loadingOverlay.classList.remove('active');
 }
 
-async function handlePdfUpload(e) {
-    const key = getApiKey();
-    if (!key) {
-        showToast("Missing Gemini API Key! Check Settings.", "fa-circle-exclamation");
-        DOM.settingsModal.classList.add('active');
-        e.target.value = '';
-        return;
-    }
+/**
+ * PDFConverter - Local PDF to Markdown Parser
+ * Logic ported and enhanced from pdf_to_md.py
+ * Features:
+ * - Dynamic font hierarchy detection (H1, H2, H3 from top sizes)
+ * - Text item grouping into lines
+ * - Bold/Italic preservation
+ * - Paragraph merging
+ */
+const PDFConverter = {
+    async convert(file, onProgress) {
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        const totalPages = pdf.numPages;
 
+        let allPagesContent = [];
+        let fontSizeFreq = {};
+
+        // Pass 1: Extract all text items and analyze font sizes
+        for (let i = 1; i <= totalPages; i++) {
+            if (onProgress) onProgress(i, totalPages, 'Analyzing');
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            
+            // Wait for commonObjs to be ready
+            await page.getOperatorList(); 
+
+            // Collect font info
+            const items = textContent.items.map(item => {
+                const fontSize = Math.round(item.transform[0] * 10) / 10;
+                if (fontSize > 5) { // Skip tiny noise
+                    fontSizeFreq[fontSize] = (fontSizeFreq[fontSize] || 0) + item.str.length;
+                }
+                
+                // Try to resolve font style from commonObjs
+                let isBold = false;
+                let isItalic = false;
+                if (item.fontName) {
+                    const fontInfo = page.commonObjs.get(item.fontName);
+                    if (fontInfo && fontInfo.name) {
+                        const name = fontInfo.name.toLowerCase();
+                        isBold = name.includes('bold') || name.includes('condensed');
+                        isItalic = name.includes('italic') || name.includes('oblique');
+                    }
+                }
+
+                return {
+                    text: item.str,
+                    x: item.transform[4],
+                    y: item.transform[5],
+                    size: fontSize,
+                    isBold,
+                    isItalic
+                };
+            });
+
+            allPagesContent.push({ items });
+        }
+
+        // Determine dynamic hierarchy
+        const sortedSizes = Object.keys(fontSizeFreq)
+            .map(Number)
+            .sort((a, b) => b - a); // Largest first
+
+        // Find the most frequent size as the "Body" text size
+        const bodySize = Number(Object.entries(fontSizeFreq).reduce((a, b) => a[1] > b[1] ? a : b)[0]);
+        const headingSizes = sortedSizes.filter(s => s > bodySize);
+
+        const H1_SIZE = headingSizes[0] || 24;
+        const H2_SIZE = headingSizes[1] || 18;
+        const H3_SIZE = headingSizes[2] || 14;
+
+        console.log(`Detected Sizes: H1=${H1_SIZE}, H2=${H2_SIZE}, H3=${H3_SIZE}, Body=${bodySize}`);
+
+        let markdownLines = [];
+
+        // Pass 2: Grouping items into lines and classifying
+        for (let i = 0; i < allPagesContent.length; i++) {
+            if (onProgress) onProgress(i + 1, totalPages, 'Converting');
+            const { items } = allPagesContent[i];
+            
+            // Group by Y (within a small threshold)
+            const linesMap = new Map();
+            items.forEach(item => {
+                const y = Math.round(item.y);
+                let found = false;
+                for (let [ly, lineItems] of linesMap) {
+                    if (Math.abs(y - ly) < 3) {
+                        lineItems.push(item);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) linesMap.set(y, [item]);
+            });
+
+            // Sort lines by Y descending
+            const sortedLines = Array.from(linesMap.entries())
+                .sort((a, b) => b[0] - a[0])
+                .map(([y, lineItems]) => lineItems.sort((a, b) => a.x - b.x));
+
+            sortedLines.forEach(lineItems => {
+                const domItem = lineItems.reduce((a, b) => a.size * a.text.length > b.size * b.text.length ? a : b);
+                const rawLineText = lineItems.map(it => it.text).join('').trim();
+                
+                if (!rawLineText) return;
+
+                // Handle inline formatting
+                const lineTextFormatted = lineItems.map(it => {
+                    let t = it.text;
+                    if (it.isBold && it.size <= H3_SIZE) t = `**${t}**`;
+                    if (it.isItalic && it.size <= H3_SIZE) t = `*${t}*`;
+                    return t;
+                }).join('').trim();
+
+                // Skip running headers/footers
+                if (domItem.size <= 10.5 && (rawLineText.match(/^\d+$/) || rawLineText.length < 5)) return;
+
+                if (domItem.size >= H1_SIZE && domItem.isBold) {
+                    markdownLines.push(`# ${rawLineText}\n`);
+                } else if (domItem.size >= H2_SIZE && domItem.isBold) {
+                    markdownLines.push(`## ${rawLineText}\n`);
+                } else if (domItem.size >= H3_SIZE && domItem.isBold) {
+                    markdownLines.push(`### ${rawLineText}\n`);
+                } else if (rawLineText.startsWith('•') || rawLineText.startsWith('■') || rawLineText.startsWith('-')) {
+                    markdownLines.push(`- ${rawLineText.replace(/^[•■-]\s*/, '')}`);
+                } else {
+                    markdownLines.push(lineTextFormatted);
+                }
+            });
+            markdownLines.push(""); 
+        }
+
+        return this.mergeParagraphs(markdownLines);
+    },
+
+    mergeParagraphs(lines) {
+        const result = [];
+        let buffer = [];
+
+        const flush = () => {
+            if (buffer.length > 0) {
+                result.push(buffer.join(' ').replace(/\s+/g, ' '));
+                buffer = [];
+            }
+        };
+
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) {
+                flush();
+                result.push("");
+                return;
+            }
+
+            if (trimmed.startsWith('#') || trimmed.startsWith('-')) {
+                flush();
+                result.push(trimmed);
+            } else {
+                buffer.push(trimmed);
+            }
+        });
+
+        flush();
+
+        return result.filter((l, i, arr) => !(l === "" && arr[i-1] === "")).join('\n');
+    }
+};
+
+async function handlePdfUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // File size limit: 1MB
-    const MAX_SIZE = 1 * 1024 * 1024;
+    // Increased limit to 50MB for local processing
+    const MAX_SIZE = 50 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-        showToast("File is too large! Maximum size is 1MB.", "fa-circle-exclamation");
+        showToast("File is too large! Maximum size is 50MB.", "fa-circle-exclamation");
         e.target.value = '';
         return;
     }
 
     const uploadBtn = document.getElementById('upload-pdf-btn');
     const originalHtml = uploadBtn.innerHTML;
-    uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> UPLOADING...';
+    uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> PARSING...';
     uploadBtn.disabled = true;
 
     DOM.loadingOverlay.classList.add('active');
-    document.querySelector('.loading-title').innerText = "Processing PDF";
-    document.querySelector('.loading-subtitle').innerText = "Gemini is converting your document to Markdown...";
-
+    
     try {
-        const fetchPdfMarkdown = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = async () => {
-                    const base64 = reader.result.split(',')[1];
-                    const prompt = "Convert this PDF to well-formatted Markdown. Return ONLY markdown.";
-
-                    try {
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                contents: [{
-                                    parts: [
-                                        { text: prompt },
-                                        { inlineData: { mimeType: "application/pdf", data: base64 } }
-                                    ]
-                                }]
-                            })
-                        });
-                        const data = await response.json();
-                        resolve(data.candidates?.[0]?.content?.parts?.[0]?.text || "");
-                    } catch (err) {
-                        reject(err);
-                    }
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        };
-
-        const md = await fetchPdfMarkdown(file);
+        const md = await PDFConverter.convert(file, (current, total, phase) => {
+            if (DOM.loadingTitle) DOM.loadingTitle.innerText = `${phase} PDF`;
+            if (DOM.loadingSubtitle) DOM.loadingSubtitle.innerText = `Page ${current} of ${total}...`;
+        });
 
         if (md) {
-            const cleanMd = md.replace(/^```markdown\s*/i, '').replace(/```\s*$/i, '');
-
             // Load to RT first
-            const html = marked.parse(cleanMd);
+            const html = marked.parse(md);
             quill.clipboard.dangerouslyPasteHTML(html);
 
             // Then sync to MD editor
-            DOM.markdownInput.value = cleanMd;
+            DOM.markdownInput.value = md;
 
             saveToLocal();
 
-            // Success Popup state
-            document.querySelector('.loading-title').innerText = "All Set!";
-            document.querySelector('.loading-subtitle').innerText = "Your content has been imported to the editor.";
+            if (DOM.loadingTitle) DOM.loadingTitle.innerText = "All Set!";
+            if (DOM.loadingSubtitle) DOM.loadingSubtitle.innerText = "Your content has been imported to the editor.";
 
             setTimeout(() => {
                 DOM.loadingOverlay.classList.remove('active');
                 uploadBtn.innerHTML = originalHtml;
                 uploadBtn.disabled = false;
-                showToast("PDF Converted Successfully");
+                showToast("PDF Converted Locally");
             }, 1000);
         } else {
-            throw new Error("No content returned");
+            throw new Error("No content found");
         }
 
     } catch (err) {
-        console.error(err);
-        showToast("PDF Conversion Failed", "fa-circle-exclamation");
+        console.error("PDF Parsing Error:", err);
+        showToast(`PDF Failed: ${err.message}`, "fa-circle-exclamation");
         DOM.loadingOverlay.classList.remove('active');
         uploadBtn.innerHTML = originalHtml;
         uploadBtn.disabled = false;
@@ -531,6 +722,7 @@ async function handlePdfUpload(e) {
         e.target.value = '';
     }
 }
+
 
 // --- Initialization ---
 window.addEventListener('DOMContentLoaded', () => {
@@ -558,6 +750,11 @@ window.addEventListener('DOMContentLoaded', () => {
     DOM.exportBtn.addEventListener('click', exportMarkdown);
     DOM.aiPolishBtn.addEventListener('click', handleAIPolish);
     DOM.aiSummarizeBtn.addEventListener('click', handleAISummarize);
+
+    DOM.rtCopyBtn.addEventListener('click', () => handleCopy('rt'));
+    DOM.mdCopyBtn.addEventListener('click', () => handleCopy('md'));
+    DOM.rtPasteBtn.addEventListener('click', () => handlePaste('rt'));
+    DOM.mdPasteBtn.addEventListener('click', () => handlePaste('md'));
 
     // Settings Listeners
     DOM.settingsBtn.addEventListener('click', () => {
